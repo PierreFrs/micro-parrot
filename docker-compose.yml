@@ -1,0 +1,60 @@
+services:
+  ollama:
+    build:
+      context: .
+      dockerfile: ollama.Dockerfile
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_storage:/root/.ollama
+    user: root # Run as root to ensure volume access
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+        reservations:
+          memory: 1.2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  model-puller:
+    image: curlimages/curl
+    depends_on:
+      ollama:
+        condition: service_healthy
+    command: >
+      sh -c "
+        curl -X POST http://ollama:11434/api/pull -d '{\"name\":\"tinyllama\"}' -N &&
+        echo 'Model pulled successfully'
+      "
+    restart: "no"
+
+  webui:
+    image: ollamawebui/ollama-webui
+    ports:
+      - "3000:8080"
+    depends_on:
+      model-puller:
+        condition: service_completed_successfully
+    environment:
+      - OLLAMA_API_BASE_URL=http://ollama:11434/api
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    ports:
+      - "5000:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+    depends_on:
+      model-puller:
+        condition: service_completed_successfully
+
+volumes:
+  ollama_storage:

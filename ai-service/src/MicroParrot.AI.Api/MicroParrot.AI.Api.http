@@ -1,0 +1,6 @@
+@MicroParrot.AI.Api_HostAddress = http://localhost:5073
+
+GET {{MicroParrot.AI.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
